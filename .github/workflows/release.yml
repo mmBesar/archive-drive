@@ -28,7 +28,7 @@ jobs:
 
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -45,7 +45,7 @@ jobs:
           tar -czf archive-drive-${{ matrix.arch }}.tar.gz -C dist archive-drive
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: archive-drive-${{ matrix.arch }}
           path: archive-drive-${{ matrix.arch }}.tar.gz
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
           merge-multiple: true

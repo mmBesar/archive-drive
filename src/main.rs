@@ -5,16 +5,23 @@ use clap::Parser;
 use std::path::PathBuf;
 use std::time::Instant;
 
-/// Scan a folder/drive and generate a fast, searchable, offline HTML catalog.
+/// Fast, searchable, offline HTML catalogs for cold storage drives.
+///
+/// Point it at a folder or drive — by default it writes a self-contained
+/// HTML catalog named after that folder, in the current directory.
 #[derive(Parser)]
-#[command(name = "archive-drive", version, about)]
+#[command(name = "archive-drive", version, about, arg_required_else_help = true)]
 struct Args {
     /// Directory or drive to scan
     path: PathBuf,
 
-    /// Write the searchable HTML catalog to this file
+    /// Directory to write the HTML catalog into
+    #[arg(long, default_value = ".")]
+    output_dir: PathBuf,
+
+    /// Filename for the HTML catalog (default: <folder-name>.html)
     #[arg(long)]
-    html: Option<PathBuf>,
+    output_name: Option<String>,
 
     /// Also print the recursive folder tree in the terminal (verbose, can be long)
     #[arg(long)]
@@ -23,6 +30,18 @@ struct Args {
     /// Depth for --show-tree
     #[arg(long, default_value_t = 2)]
     tree_depth: usize,
+}
+
+/// Derives the default output filename from the scanned folder's own name,
+/// e.g. `/mnt/data` -> `data.html`. Falls back to `catalog.html` for edge
+/// cases like scanning `/` itself, where there's no folder name to use.
+fn default_output_name(path: &std::path::Path) -> String {
+    let base = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "catalog".to_string());
+    format!("{base}.html")
 }
 
 fn main() {
@@ -49,14 +68,17 @@ fn main() {
         scanner::print_tree(&root, ".", 0, args.tree_depth);
     }
 
-    if let Some(out_path) = &args.html {
-        let html_start = Instant::now();
-        let final_html = html::render(&args.path, &root);
-        std::fs::write(out_path, final_html).expect("write HTML output");
-        println!(
-            "\nHTML catalog written to {} in {:?}",
-            out_path.display(),
-            html_start.elapsed()
-        );
-    }
+    let output_name = args
+        .output_name
+        .unwrap_or_else(|| default_output_name(&args.path));
+    let out_path = args.output_dir.join(output_name);
+
+    let html_start = Instant::now();
+    let final_html = html::render(&args.path, &root);
+    std::fs::write(&out_path, final_html).expect("write HTML output");
+    println!(
+        "\nHTML catalog written to {} in {:?}",
+        out_path.display(),
+        html_start.elapsed()
+    );
 }

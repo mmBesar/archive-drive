@@ -15,6 +15,10 @@ struct Args {
     /// Directory or drive to scan
     path: PathBuf,
 
+    /// Write the HTML catalog to this exact path (overrides --output-dir/--output-name)
+    #[arg(short = 'o', long = "output")]
+    output: Option<PathBuf>,
+
     /// Directory to write the HTML catalog into
     #[arg(long, default_value = ".")]
     output_dir: PathBuf,
@@ -68,10 +72,15 @@ fn main() {
         scanner::print_tree(&root, ".", 0, args.tree_depth);
     }
 
-    let output_name = args
-        .output_name
-        .unwrap_or_else(|| default_output_name(&args.path));
-    let out_path = args.output_dir.join(output_name);
+    let out_path = match args.output {
+        Some(explicit) => explicit,
+        None => {
+            let output_name = args
+                .output_name
+                .unwrap_or_else(|| default_output_name(&args.path));
+            args.output_dir.join(output_name)
+        }
+    };
 
     let html_start = Instant::now();
     let final_html = html::render(&args.path, &root);

@@ -87,6 +87,7 @@ archive-drive              # no args: prints help
 | Flag | Default | Description |
 |---|---|---|
 | `<path>` | — | Directory or drive to scan (required) |
+| `-o, --output <path>` | — | Write the catalog to this exact path (overrides the two below) |
 | `--output-dir <dir>` | `.` | Directory to write the HTML catalog into |
 | `--output-name <name>` | `<folder-name>.html` | Filename for the catalog |
 | `--show-tree` | off | Also print the recursive folder tree in the terminal |
@@ -98,10 +99,13 @@ archive-drive              # no args: prints help
 # Default: writes ./data.html
 archive-drive /mnt/data
 
-# Choose where it lands
+# Quick one-shot output path
+archive-drive /mnt/data -o ~/catalogs/data.html
+
+# Or split it: choose where it lands
 archive-drive /mnt/data --output-dir ~/catalogs
 
-# Choose the filename too
+# ...and/or choose the filename too
 archive-drive /mnt/data --output-dir ~/catalogs --output-name backup-drive-2026.html
 
 # Peek at the folder structure in the terminal while you're at it

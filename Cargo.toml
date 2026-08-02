@@ -1,0 +1,23 @@
+[package]
+name = "archive-drive"
+version = "0.1.0"
+edition = "2021"
+description = "Fast offline HTML catalog generator for cold storage drives"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/mmBesar/archive-drive"
+readme = "README.md"
+
+[[bin]]
+name = "archive-drive"
+path = "src/main.rs"
+
+[dependencies]
+jwalk = "0.8"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

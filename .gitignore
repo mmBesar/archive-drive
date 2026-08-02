@@ -1,0 +1,6 @@
+/target
+*.html
+!template.html
+.vscode/
+.idea/
+*.swp

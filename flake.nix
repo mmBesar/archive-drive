@@ -11,9 +11,6 @@
       let
         pkgs = import nixpkgs { inherit system; };
 
-        # Cross toolchains — for local cross-compile sanity checks only.
-        # Final CI builds happen natively per-arch, these are just to
-        # catch obvious breakage before pushing.
         pkgsAarch64 = import nixpkgs {
           inherit system;
           crossSystem = { config = "aarch64-unknown-linux-gnu"; };
@@ -37,7 +34,6 @@
           RUST_BACKTRACE = "1";
         };
 
-        # Enter with: nix develop .#arm64
         devShells.arm64 = pkgs.mkShell {
           name = "archive-drive-arm64";
           buildInputs = [ pkgs.cargo pkgs.rustc ];
@@ -46,7 +42,6 @@
             "${pkgsAarch64.stdenv.cc}/bin/${pkgsAarch64.stdenv.cc.targetPrefix}cc";
         };
 
-        # Enter with: nix develop .#riscv64
         devShells.riscv64 = pkgs.mkShell {
           name = "archive-drive-riscv64";
           buildInputs = [ pkgs.cargo pkgs.rustc ];

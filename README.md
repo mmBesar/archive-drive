@@ -1,6 +1,8 @@
 <div align="center">
 
-# ◆ archive-drive
+<img src="assets/icon.svg" width="96" height="96" alt="archive-drive icon">
+
+# archive-drive
 
 **Fast, offline, searchable HTML catalogs for cold storage drives.**
 
@@ -31,9 +33,12 @@ again just to check.
 - **One self-contained HTML file per drive.** Everything's embedded — the
   catalog works forever, offline, on any machine, with zero dependencies.
 - **Real explorer-style browsing** — breadcrumb navigation, a sortable
-  table (name / type / items / size), and a toggleable sidebar tree.
-- **Search** across both files and folders, jumping straight to wherever
-  a match lives.
+  table (name / type / items / modified / size), and a toggleable sidebar
+  tree.
+- **Search** across both files and folders, with a toggle to scope it to
+  just the current folder instead of the whole drive.
+- **Modified-date metadata** — per file, and rolled up per folder as the
+  most recent change anywhere inside it.
 - **Catppuccin Macchiato theme**, mauve accent.
 - **Portable output** — shows just the drive's folder name (e.g. `/data`),
   never the full absolute path, since that won't mean anything once the
@@ -102,10 +107,7 @@ archive-drive /mnt/data
 # Quick one-shot output path
 archive-drive /mnt/data -o ~/catalogs/data.html
 
-# Or split it: choose where it lands
-archive-drive /mnt/data --output-dir ~/catalogs
-
-# ...and/or choose the filename too
+# ...or split it: choose where it lands, and/or the filename
 archive-drive /mnt/data --output-dir ~/catalogs --output-name backup-drive-2026.html
 
 # Peek at the folder structure in the terminal while you're at it
@@ -115,6 +117,14 @@ archive-drive /mnt/data --show-tree --tree-depth 3
 Terminal output always includes a quick scan summary regardless of
 flags — file count, total size, a top-10 file-type breakdown, and how
 long the scan took.
+
+### In the generated HTML
+
+- Click any column header (Name / Type / Items / Modified / Size) to sort;
+  click again to reverse.
+- Click a folder row (or a sidebar entry) to browse into it.
+- **"This folder only"** next to the search box scopes matches to the
+  folder you're currently browsing, instead of the whole drive.
 
 ## Design notes
 

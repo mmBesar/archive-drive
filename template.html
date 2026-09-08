@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>archive-drive</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgNjQgNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMyNDI3M2EiLz4KICA8cmVjdCB4PSIxMiIgeT0iMTYiIHdpZHRoPSIzMiIgaGVpZ2h0PSIyNCIgcng9IjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2M2YTBmNiIgc3Ryb2tlLXdpZHRoPSIzLjUiLz4KICA8bGluZSB4MT0iMTIiIHkxPSIyNyIgeDI9IjQ0IiB5Mj0iMjciIHN0cm9rZT0iI2M2YTBmNiIgc3Ryb2tlLXdpZHRoPSIzLjUiLz4KICA8Y2lyY2xlIGN4PSIxOSIgY3k9IjMzLjUiIHI9IjEuOCIgZmlsbD0iI2M2YTBmNiIvPgogIDxjaXJjbGUgY3g9IjI2IiBjeT0iMzMuNSIgcj0iMS44IiBmaWxsPSIjYzZhMGY2Ii8+CiAgPGNpcmNsZSBjeD0iNDMiIGN5PSI0MyIgcj0iOC41IiBmaWxsPSIjMjQyNzNhIiBzdHJva2U9IiNjYWQzZjUiIHN0cm9rZS13aWR0aD0iMy41Ii8+CiAgPGxpbmUgeDE9IjQ5IiB5MT0iNDkiIHgyPSI1Ni41IiB5Mj0iNTYuNSIgc3Ryb2tlPSIjY2FkM2Y1IiBzdHJva2Utd2lkdGg9IjQuMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjwvc3ZnPgo=">
 <style>
   :root {
     --base: #24273a;
@@ -47,6 +48,7 @@
     font-size: 0.85rem;
   }
   #sidebar-toggle:hover, #sidebar-toggle.active { color: var(--mauve); border-color: var(--mauve); }
+
   .search-wrap { position: relative; flex: 1; max-width: 420px; }
   #search {
     width: 100%;
@@ -75,6 +77,20 @@
   }
   #search-clear.visible { display: block; }
   #search-clear:hover { color: var(--mauve); background: var(--surface1); }
+
+  .scope-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    color: var(--subtext0);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  .scope-toggle input { accent-color: var(--mauve); cursor: pointer; }
+  .scope-toggle:hover { color: var(--text); }
+
   #stats { color: var(--subtext0); font-size: 0.82rem; margin-left: auto; white-space: nowrap; }
 
   #layout { position: relative; }
@@ -115,7 +131,7 @@
   .side-icon { flex-shrink: 0; }
 
   main { padding: 0 1.5rem 3rem; }
-  #content-inner { max-width: 1000px; margin: 0 auto; }
+  #content-inner { max-width: 1050px; margin: 0 auto; }
 
   #breadcrumb {
     display: flex;
@@ -160,7 +176,7 @@
   thead th:hover { color: var(--mauve); }
   thead th.sorted { color: var(--mauve); }
   thead th .arrow { display: inline-block; width: 0.8em; opacity: 0.8; }
-  thead th.col-size, thead th.col-items { text-align: right; }
+  thead th.col-size, thead th.col-items, thead th.col-modified { text-align: right; }
 
   tbody tr { cursor: default; transition: background 0.12s; }
   tbody tr.row-folder { cursor: pointer; }
@@ -180,7 +196,7 @@
   td.col-name .icon { font-size: 1.05rem; width: 1.3rem; text-align: center; }
   .name-text { color: var(--text); }
   .row-folder .name-text { font-weight: 500; }
-  td.col-size, td.col-items {
+  td.col-size, td.col-items, td.col-modified {
     text-align: right;
     color: var(--subtext0);
     white-space: nowrap;
@@ -200,6 +216,7 @@
     header { flex-wrap: wrap; row-gap: 0.6rem; }
     .search-wrap { max-width: none; order: 3; flex-basis: 100%; }
     #stats { margin-left: 0; }
+    td.col-modified, th.col-modified { display: none; }
   }
 </style>
 </head>
@@ -211,6 +228,10 @@
     <input id="search" type="text" placeholder="Search files…" autocomplete="off">
     <button id="search-clear" type="button" aria-label="Clear search">✕</button>
   </div>
+  <label class="scope-toggle">
+    <input type="checkbox" id="scope-toggle">
+    This folder only
+  </label>
   <span id="stats"></span>
 </header>
 <div id="layout">
@@ -226,6 +247,7 @@
                 <th class="col-name" data-sort="name">Name <span class="arrow"></span></th>
                 <th class="col-type" data-sort="type">Type <span class="arrow"></span></th>
                 <th class="col-items" data-sort="items">Items <span class="arrow"></span></th>
+                <th class="col-modified" data-sort="modified">Modified <span class="arrow"></span></th>
                 <th class="col-size" data-sort="size">Size <span class="arrow"></span></th>
               </tr>
             </thead>
@@ -242,8 +264,6 @@
 const PAYLOAD = __ARCHIVE_DRIVE_DATA__;
 const ROOT = PAYLOAD.tree;
 
-// Show just the last path segment — the full path won't mean anything
-// once this file moves to another machine.
 const segments = PAYLOAD.scan_path.split(/[\\/]/).filter(Boolean);
 const ROOT_LABEL = "/" + (segments.length ? segments[segments.length - 1] : "");
 
@@ -254,6 +274,12 @@ function humanSize(bytes) {
   let i = 0, n = bytes;
   while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
   return n.toFixed(i === 0 ? 0 : 1) + " " + units[i];
+}
+
+function humanDate(unixSeconds) {
+  if (!unixSeconds) return "—";
+  const d = new Date(unixSeconds * 1000);
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 function escapeHtml(s) {
@@ -349,10 +375,12 @@ function renderTable(flashName) {
     name, isFolder: true,
     size: node.children[name].recursive_size,
     items: node.children[name].recursive_file_count,
+    modified: node.children[name].recursive_modified,
     type: "Folder",
   }));
   const files = (node.files || []).map(f => ({
     name: f.name, isFolder: false, size: f.size, items: null,
+    modified: f.modified,
     type: extOf(f.name) ? extOf(f.name).toUpperCase() + " file" : "File",
   }));
 
@@ -362,6 +390,7 @@ function renderTable(flashName) {
     else if (sortCol === "size") r = a.size - b.size;
     else if (sortCol === "type") r = a.type.localeCompare(b.type);
     else if (sortCol === "items") r = (a.items ?? -1) - (b.items ?? -1);
+    else if (sortCol === "modified") r = a.modified - b.modified;
     return r * sortDir;
   };
   folders.sort(cmp);
@@ -378,6 +407,7 @@ function renderTable(flashName) {
       <td class="col-name"><span class="icon">${iconFor(r.name, r.isFolder)}</span><span class="name-text">${escapeHtml(r.name)}</span></td>
       <td class="col-type">${escapeHtml(r.type)}</td>
       <td class="col-items">${r.items !== null ? r.items.toLocaleString() : ""}</td>
+      <td class="col-modified">${humanDate(r.modified)}</td>
       <td class="col-size">${humanSize(r.size)}</td>
     `;
     if (r.isFolder) tr.onclick = () => navigate([...currentPath, r.name]);
@@ -400,7 +430,7 @@ document.getElementById("stats").textContent =
 render();
 
 // ---------- sidebar (lazy, toggleable) ----------
-const sidebarNodeMap = {}; // JSON path -> { wrapper, row, toggle }
+const sidebarNodeMap = {};
 let sidebarBuilt = false;
 
 function renderSidebarNode(node, name, path) {
@@ -457,7 +487,7 @@ function buildSidebar() {
   const rootNode = renderSidebarNode(ROOT, "💾 " + ROOT_LABEL, []);
   rootNode.querySelector(".side-icon").innerHTML = `<span>💾</span> ${escapeHtml(ROOT_LABEL)}`;
   sb.appendChild(rootNode);
-  sidebarNodeMap[JSON.stringify([])].toggle(true); // reveal top-level folders by default
+  sidebarNodeMap[JSON.stringify([])].toggle(true);
   highlightSidebar(currentPath);
 }
 
@@ -481,28 +511,25 @@ sidebarToggleBtn.addEventListener("click", () => {
   if (showing) buildSidebar();
 });
 
-// ---------- search ----------
-let allEntries = null;
-function buildSearchIndex() {
-  if (allEntries) return;
-  allEntries = [];
-  (function walk(node, path) {
-    for (const cn of Object.keys(node.children)) {
+// ---------- search (files + folders, scoped to current folder or whole drive) ----------
+function collectEntries(node, basePath) {
+  const out = [];
+  (function walk(n, path) {
+    for (const cn of Object.keys(n.children)) {
       const childPath = [...path, cn];
-      allEntries.push({
-        name: cn, size: node.children[cn].recursive_size,
-        path: childPath, isFolder: true,
-      });
-      walk(node.children[cn], childPath);
+      out.push({ name: cn, size: n.children[cn].recursive_size, path: childPath, isFolder: true });
+      walk(n.children[cn], childPath);
     }
-    for (const f of (node.files || [])) {
-      allEntries.push({ name: f.name, size: f.size, path, isFolder: false });
+    for (const f of (n.files || [])) {
+      out.push({ name: f.name, size: f.size, path, isFolder: false });
     }
-  })(ROOT, []);
+  })(node, basePath);
+  return out;
 }
 
 const searchInput = document.getElementById("search");
 const clearBtn = document.getElementById("search-clear");
+const scopeToggle = document.getElementById("scope-toggle");
 const resultsEl = document.getElementById("search-results");
 const browseView = document.getElementById("browse-view");
 
@@ -510,34 +537,29 @@ function updateClearBtn() {
   clearBtn.classList.toggle("visible", searchInput.value.length > 0);
 }
 
-clearBtn.addEventListener("click", () => {
-  searchInput.value = "";
-  updateClearBtn();
-  resultsEl.classList.remove("active");
-  browseView.classList.remove("hidden");
-  searchInput.focus();
-});
-
-searchInput.addEventListener("input", () => {
-  updateClearBtn();
+function runSearch() {
   const q = searchInput.value.trim().toLowerCase();
   if (!q) {
     resultsEl.classList.remove("active");
     browseView.classList.remove("hidden");
     return;
   }
-  buildSearchIndex();
   browseView.classList.add("hidden");
   resultsEl.classList.add("active");
-  const matches = allEntries.filter(f => f.name.toLowerCase().includes(q)).slice(0, 300);
+
+  const scoped = scopeToggle.checked;
+  const searchNode = scoped ? getNode(currentPath) : ROOT;
+  const basePath = scoped ? currentPath : [];
+  const entries = collectEntries(searchNode, basePath);
+
+  const matches = entries.filter(f => f.name.toLowerCase().includes(q)).slice(0, 300);
   resultsEl.innerHTML = matches.length === 0
-    ? `<div class="empty-note">No matches</div>`
+    ? `<div class="empty-note">No matches${scoped ? " in this folder" : ""}</div>`
     : `<div class="table-card"><table><tbody>` + matches.map(f => {
     const idx = f.name.toLowerCase().indexOf(q);
     const hl = idx >= 0
       ? escapeHtml(f.name.slice(0, idx)) + "<mark>" + escapeHtml(f.name.slice(idx, idx + q.length)) + "</mark>" + escapeHtml(f.name.slice(idx + q.length))
       : escapeHtml(f.name);
-    // For a folder match, show where it lives (its parent); for a file, show its containing folder.
     const parentPath = f.isFolder ? f.path.slice(0, -1) : f.path;
     const pathStr = "💾 " + escapeHtml(ROOT_LABEL) +
       (parentPath.length ? " › " + parentPath.map(escapeHtml).join(" › ") : "");
@@ -557,11 +579,21 @@ searchInput.addEventListener("input", () => {
       updateClearBtn();
       resultsEl.classList.remove("active");
       browseView.classList.remove("hidden");
-      // Folder match: jump into it. File match: jump to its folder and flash the row.
       navigate(path, isFolder ? undefined : row.dataset.name);
     });
   });
+}
+
+clearBtn.addEventListener("click", () => {
+  searchInput.value = "";
+  updateClearBtn();
+  resultsEl.classList.remove("active");
+  browseView.classList.remove("hidden");
+  searchInput.focus();
 });
+
+searchInput.addEventListener("input", () => { updateClearBtn(); runSearch(); });
+scopeToggle.addEventListener("change", () => { if (searchInput.value.trim()) runSearch(); });
 </script>
 </body>
 </html>

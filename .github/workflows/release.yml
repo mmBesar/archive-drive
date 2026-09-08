@@ -21,15 +21,19 @@ jobs:
           - arch: arm64
             target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04-arm
+          # RISE Project's native riscv64 runner. Requires the RISE RISC-V
+          # Runners (Personal) GitHub App installed on this repo:
+          # https://github.com/apps/rise-risc-v-runners-personal
           - arch: riscv64
             target: riscv64gc-unknown-linux-gnu
             runner: ubuntu-24.04-riscv
 
+    name: build (${{ matrix.arch }}, ${{ matrix.target }}, ${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install Rust
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -40,8 +44,8 @@ jobs:
       - name: Package
         run: |
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/archive-drive dist/archive-drive
-          tar -czf archive-drive-${{ matrix.arch }}.tar.gz -C dist archive-drive
+          cp target/${{ matrix.target }}/release/archive-drive dist/
+          tar -C dist -czf archive-drive-${{ matrix.arch }}.tar.gz archive-drive
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6

@@ -210,6 +210,7 @@
   #search-results.active { display: block; }
   #browse-view.hidden { display: none; }
   .result-path { color: var(--overlay0); font-size: 0.75rem; margin-top: 0.1rem; }
+  .result-count { color: var(--overlay0); font-size: 0.8rem; padding: 0.2rem 0.2rem 0.6rem; }
   mark { background: var(--mauve); color: var(--crust); border-radius: 3px; padding: 0 2px; }
 
   @media (max-width: 640px) {
@@ -225,7 +226,7 @@
   <h1>◆ archive-drive</h1>
   <button id="sidebar-toggle">☰ Folders</button>
   <div class="search-wrap">
-    <input id="search" type="text" placeholder="Search files…" autocomplete="off">
+    <input id="search" type="text" placeholder="Search files &amp; folders…" autocomplete="off" title="Ignores case, accents and . _ - separators; words can be in any order">
     <button id="search-clear" type="button" aria-label="Clear search">✕</button>
   </div>
   <label class="scope-toggle">
@@ -511,20 +512,130 @@ sidebarToggleBtn.addEventListener("click", () => {
   if (showing) buildSidebar();
 });
 
-// ---------- search (files + folders, scoped to current folder or whole drive) ----------
-function collectEntries(node, basePath) {
-  const out = [];
+// ---------- search (smart: separator-insensitive, any word order, files + folders) ----------
+// Normalizes text so "Ghost.Recon", "Ghost_Recon" and "ghost-recon" all become
+// "ghost recon": case, accents and punctuation are ignored, runs of separators
+// collapse to one space. With withMap, `map[i]` gives the position in the original
+// string of normalized char i (used only to highlight the few results shown).
+function prep(s, withMap) {
+  let norm = "";
+  const map = withMap ? [] : null;
+  let lastSpace = true;
+  if (!/[^\x00-\x7f]/.test(s)) {
+    // Fast path: plain ASCII (the vast majority of names).
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      let ch = null;
+      if ((c >= 97 && c <= 122) || (c >= 48 && c <= 57)) ch = s[i];
+      else if (c >= 65 && c <= 90) ch = String.fromCharCode(c + 32);
+      if (ch !== null) { norm += ch; if (map) map.push(i); lastSpace = false; }
+      else if (!lastSpace) { norm += " "; if (map) map.push(i); lastSpace = true; }
+    }
+  } else {
+    for (let i = 0; i < s.length; ) {
+      const chr = String.fromCodePoint(s.codePointAt(i));
+      const len = chr.length;
+      if (/\p{M}/u.test(chr)) { i += len; continue; } // drop combining marks / diacritics
+      if (/[\p{L}\p{N}]/u.test(chr)) {
+        const base = chr.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+        norm += base;
+        if (map) for (let k = 0; k < base.length; k++) map.push(i);
+        lastSpace = false;
+      } else if (!lastSpace) {
+        norm += " ";
+        if (map) map.push(i);
+        lastSpace = true;
+      }
+      i += len;
+    }
+  }
+  return { norm: norm.trimEnd(), map };
+}
+
+// Built once, on the first search: every file and folder with its normalized name.
+let searchIndex = null;
+function buildSearchIndex() {
+  if (searchIndex) return;
+  searchIndex = [];
+  const add = (name, size, path, isFolder) => {
+    const norm = prep(name).norm;
+    searchIndex.push({ name, norm, compact: norm.replace(/ /g, ""), size, path, isFolder });
+  };
   (function walk(n, path) {
     for (const cn of Object.keys(n.children)) {
       const childPath = [...path, cn];
-      out.push({ name: cn, size: n.children[cn].recursive_size, path: childPath, isFolder: true });
+      add(cn, n.children[cn].recursive_size, childPath, true);
       walk(n.children[cn], childPath);
     }
-    for (const f of (n.files || [])) {
-      out.push({ name: f.name, size: f.size, path, isFolder: false });
+    for (const f of (n.files || [])) add(f.name, f.size, path, false);
+  })(ROOT, []);
+}
+
+// Is this entry inside the folder `base`? (files carry their parent's path,
+// folders carry their own path)
+function inScope(e, base) {
+  if (base.length === 0) return true;
+  if (e.isFolder ? e.path.length <= base.length : e.path.length < base.length) return false;
+  for (let i = 0; i < base.length; i++) if (e.path[i] !== base[i]) return false;
+  return true;
+}
+
+// Returns a score (lower = better) or -1 for no match.
+function matchEntry(e, tokens, qCompact) {
+  let score = 0;
+  let all = true;
+  for (const t of tokens) {
+    const idx = e.norm.indexOf(t);
+    if (idx < 0) { all = false; break; }
+    score += idx + (idx === 0 || e.norm.charCodeAt(idx - 1) === 32 ? 0 : 50); // prefer word starts
+  }
+  if (all) return score;
+  // Run-together query ("ghostrecon") against a spaced name ("ghost recon").
+  if (qCompact.length >= 4) {
+    const idx = e.compact.indexOf(qCompact);
+    if (idx >= 0) return 1000 + idx;
+  }
+  return -1;
+}
+
+function endOf(name, i) {
+  return i + String.fromCodePoint(name.codePointAt(i)).length;
+}
+
+// Highlights the matched parts of the ORIGINAL name (separators included).
+function highlightName(name, tokens, qCompact) {
+  const p = prep(name, true);
+  let ranges = [];
+  let ok = true;
+  for (const t of tokens) {
+    const idx = p.norm.indexOf(t);
+    if (idx < 0) { ok = false; break; }
+    ranges.push([p.map[idx], endOf(name, p.map[idx + t.length - 1])]);
+  }
+  if (!ok) {
+    ranges = [];
+    let compact = "";
+    const cmap = [];
+    for (let i = 0; i < p.norm.length; i++) {
+      if (p.norm[i] !== " ") { compact += p.norm[i]; cmap.push(p.map[i]); }
     }
-  })(node, basePath);
-  return out;
+    const idx = compact.indexOf(qCompact);
+    if (idx >= 0) ranges.push([cmap[idx], endOf(name, cmap[idx + qCompact.length - 1])]);
+  }
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const r of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([r[0], r[1]]);
+  }
+  let html = "";
+  let pos = 0;
+  for (const [s, e] of merged) {
+    html += escapeHtml(name.slice(pos, s)) + "<mark>" + escapeHtml(name.slice(s, e)) + "</mark>";
+    pos = e;
+  }
+  return html + escapeHtml(name.slice(pos));
 }
 
 const searchInput = document.getElementById("search");
@@ -538,8 +649,8 @@ function updateClearBtn() {
 }
 
 function runSearch() {
-  const q = searchInput.value.trim().toLowerCase();
-  if (!q) {
+  const tokens = prep(searchInput.value).norm.split(" ").filter(Boolean);
+  if (tokens.length === 0) {
     resultsEl.classList.remove("active");
     browseView.classList.remove("hidden");
     return;
@@ -547,19 +658,29 @@ function runSearch() {
   browseView.classList.add("hidden");
   resultsEl.classList.add("active");
 
+  buildSearchIndex();
+  const qCompact = tokens.join("");
   const scoped = scopeToggle.checked;
-  const searchNode = scoped ? getNode(currentPath) : ROOT;
-  const basePath = scoped ? currentPath : [];
-  const entries = collectEntries(searchNode, basePath);
+  const base = scoped ? currentPath : [];
 
-  const matches = entries.filter(f => f.name.toLowerCase().includes(q)).slice(0, 300);
-  resultsEl.innerHTML = matches.length === 0
+  const hits = [];
+  for (const e of searchIndex) {
+    if (scoped && !inScope(e, base)) continue;
+    const s = matchEntry(e, tokens, qCompact);
+    if (s >= 0) hits.push({ e, s });
+  }
+  hits.sort((a, b) => a.s - b.s || a.e.name.length - b.e.name.length);
+
+  const LIMIT = 300;
+  const shown = hits.slice(0, LIMIT);
+  const countNote = hits.length > LIMIT
+    ? `Showing the best ${LIMIT} of ${hits.length.toLocaleString()} matches — refine your search to narrow it down`
+    : `${hits.length.toLocaleString()} ${hits.length === 1 ? "match" : "matches"}`;
+
+  resultsEl.innerHTML = hits.length === 0
     ? `<div class="empty-note">No matches${scoped ? " in this folder" : ""}</div>`
-    : `<div class="table-card"><table><tbody>` + matches.map(f => {
-    const idx = f.name.toLowerCase().indexOf(q);
-    const hl = idx >= 0
-      ? escapeHtml(f.name.slice(0, idx)) + "<mark>" + escapeHtml(f.name.slice(idx, idx + q.length)) + "</mark>" + escapeHtml(f.name.slice(idx + q.length))
-      : escapeHtml(f.name);
+    : `<div class="result-count">${countNote}</div><div class="table-card"><table><tbody>` + shown.map(({ e: f }) => {
+    const hl = highlightName(f.name, tokens, qCompact);
     const parentPath = f.isFolder ? f.path.slice(0, -1) : f.path;
     const pathStr = "💾 " + escapeHtml(ROOT_LABEL) +
       (parentPath.length ? " › " + parentPath.map(escapeHtml).join(" › ") : "");

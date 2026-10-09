@@ -35,8 +35,11 @@ again just to check.
 - **Real explorer-style browsing** — breadcrumb navigation, a sortable
   table (name / type / items / modified / size), and a toggleable sidebar
   tree.
-- **Search** across both files and folders, with a toggle to scope it to
-  just the current folder instead of the whole drive.
+- **Smart search** across files and folders — ignores case, accents and
+  `.` `_` `-` separators, so `Ghost Recon` finds `Ghost.Recon`,
+  `Ghost_Recon` and `ghost-recon` (and the reverse). Words match in any
+  order, results are ranked, and a toggle scopes the search to just the
+  current folder instead of the whole drive.
 - **Modified-date metadata** — per file, and rolled up per folder as the
   most recent change anywhere inside it.
 - **Catppuccin Macchiato theme**, mauve accent.
@@ -123,6 +126,9 @@ long the scan took.
 - Click any column header (Name / Type / Items / Modified / Size) to sort;
   click again to reverse.
 - Click a folder row (or a sidebar entry) to browse into it.
+- **Search** is forgiving: `ghost recon`, `Ghost.Recon`, `recon ghost` and
+  even `ghostrecon` all find the same files. Matches are highlighted and
+  the best ones come first.
 - **"This folder only"** next to the search box scopes matches to the
   folder you're currently browsing, instead of the whole drive.
 

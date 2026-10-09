@@ -21,7 +21,7 @@ columns, search — forever, offline, with no server and no database.
 
 ---
 
-## Why
+## Why?
 
 Cold storage drives don't stay plugged in. `archive-drive` scans one once,
 writes a single portable HTML file, and from then on you always know
